@@ -1,0 +1,80 @@
+name: Build and release
+on:
+  push:
+    branches:
+      - "!*"
+    tags:
+      - "v*"
+env:
+  # Common versions
+  GO_VERSION: "1.19"
+  GOLANGCI_VERSION: "v1.50.0"
+  DOCKER_BUILDX_VERSION: "v0.8.2"
+
+jobs:
+  publish-artifacts:
+    runs-on: ubuntu-22.04
+
+    steps:
+      # - name: Set the environment variable
+      #   run: echo VERSION=${GITHUB_REF_NAME#release-} >> $GITHUB_ENV
+
+      - name: Setup QEMU
+        uses: docker/setup-qemu-action@v1
+        with:
+          platforms: all
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v1
+        with:
+          version: ${{ env.DOCKER_BUILDX_VERSION }}
+          install: true
+
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          submodules: true
+
+      - name: Fetch History
+        run: git fetch --prune --unshallow
+
+      - name: Setup Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Find the Go Build Cache
+        id: go
+        run: echo "::set-output name=cache::$(make go.cachedir)"
+
+      - name: Cache the Go Build Cache
+        uses: actions/cache@v2
+        with:
+          path: ${{ steps.go.outputs.cache }}
+          key: ${{ runner.os }}-build-publish-artifacts-${{ hashFiles('**/go.sum') }}
+          restore-keys: ${{ runner.os }}-build-publish-artifacts-
+
+      - name: Cache Go Dependencies
+        uses: actions/cache@v2
+        with:
+          path: .work/pkg
+          key: ${{ runner.os }}-pkg-${{ hashFiles('**/go.sum') }}
+          restore-keys: ${{ runner.os }}-pkg-
+
+      - name: Vendor Dependencies
+        run: make vendor vendor.check
+
+      - name: Build Artifacts
+        run: make build
+        env:
+          # We're using docker buildx, which doesn't actually load the images it
+          # builds by default. Specifying --load does so.
+          BUILD_ARGS: "--load"
+          VERSION: ${{ GITHUB_REF_NAME }}
+          BUILD_REGISTRY: ${{ secrets.BUILD_REGISTRY }}
+
+      - name: Push Images
+        run: make push
+        env:
+          VERSION: ${{ env.VERSION }}
+          BUILD_REGISTRY: ${{ secrets.BUILD_REGISTRY }}
