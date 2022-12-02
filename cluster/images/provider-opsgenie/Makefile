@@ -33,9 +33,9 @@ img.build.shared:
 		--build-arg TERRAFORM_PROVIDER_DOWNLOAD_NAME=$(TERRAFORM_PROVIDER_DOWNLOAD_NAME) \
 		--build-arg TERRAFORM_PROVIDER_DOWNLOAD_URL_PREFIX=$(TERRAFORM_PROVIDER_DOWNLOAD_URL_PREFIX) \
 		--build-arg TERRAFORM_NATIVE_PROVIDER_BINARY=$(TERRAFORM_NATIVE_PROVIDER_BINARY) \
-		-t $(IMAGE) \
-		$(IMAGE_TEMP_DIR) || $(FAIL)
+		-t $(IMAGE)	$(IMAGE_TEMP_DIR) || $(FAIL)
 	@docker tag $(IMAGE) "$(IMAGE):$(VERSION)" || $(FAIL)
+	@$(OK) docker build $(IMAGE):$(VERSION)
 
 img.promote:
 	@$(INFO) Skipping image promotion from $(FROM_IMAGE) to $(TO_IMAGE)
